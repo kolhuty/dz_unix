@@ -1,0 +1,40 @@
+#!/bin/bash
+
+
+file="/etc/passwd"
+login="$(whoami)"
+
+while getopts "f:" opt; do
+    case $opt in
+        f)
+            file="$OPTARG"
+            ;;
+        *)
+            error_exit "Использование: userhome [-f file] [login]" 1
+            ;;
+    esac
+done
+
+# Проверка, если есть дополнительный аргумент - логи
+shift $((OPTIND - 1))
+if [ -n "$1" ]; then
+    login="$1"
+fi
+
+# Проверка существования файла
+if [ ! -f "$file" ]; then
+    echo "Не удается открыть файл: $file" >&2
+    exit 2
+fi
+
+# Поиск домашнего каталога пользователя в файле
+home_dir=$(grep "^$login:" "$file" | cut -d: -f6)
+
+
+if [ -z "$home_dir" ]; then
+    echo "Пользователь $login не найден" >&2
+    exit 1
+fi
+
+echo "$home_dir"
+exit 0
