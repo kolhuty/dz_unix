@@ -1,9 +1,9 @@
 #!/bin/bash
 
-
 file="/etc/passwd"
 login="$(whoami)"
 
+# Проход по аргументам
 while getopts "f:" opt; do
     case $opt in
         f)
@@ -15,7 +15,7 @@ while getopts "f:" opt; do
     esac
 done
 
-# Проверка, если есть дополнительный аргумент - логи
+# Проверка, если есть дополнительный аргумент - логин
 shift $((OPTIND - 1))
 if [ -n "$1" ]; then
     login="$1"
@@ -30,11 +30,12 @@ fi
 # Поиск домашнего каталога пользователя в файле
 home_dir=$(grep "^$login:" "$file" | cut -d: -f6)
 
-
+# Если пользователь не найден
 if [ -z "$home_dir" ]; then
     echo "Пользователь $login не найден" >&2
     exit 1
 fi
 
+#Вывод домашнего каталога
 echo "$home_dir"
 exit 0
