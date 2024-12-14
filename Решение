@@ -1,0 +1,82 @@
+#!/bin/bash
+
+# Функция для вывода справки
+show_help() {
+    cat << EOF
+Usage: topsize [--help] [-h] [-N] [-s minsize] [--] [dir...]
+
+Options:
+  --help        Show this help message and exit
+  -h            Display file sizes in human-readable format
+  -N <number>   Number of files to display (e.g., -10)
+  -s <minsize>  Minimum file size in bytes (default: 1 byte)
+  dir...        Directories to search (default: current directory)
+  --            Separator for options and directories
+EOF
+}
+
+minsize=1
+nfiles=""
+human_readable=false
+directories=(".")
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help)
+            show_help
+            exit 0
+            ;;
+        -h)
+            human_readable=true
+            shift
+            ;;
+        -N)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: -N option requires a numeric argument." >&2
+                exit 1
+            fi
+            nfiles="$2"
+            shift 2
+            ;;
+        -s)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: -s option requires a numeric argument." >&2
+                exit 1
+            fi
+            minsize="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            directories=("$@")
+            break
+            ;;
+        -*|--*)
+            echo "Error: Unknown option $1" >&2
+            exit 1
+            ;;
+        *)
+            directories=("$@")
+            break
+            ;;
+    esac
+done
+
+# проверка каталогов
+for dir in "${directories[@]}"; do
+    if [[ ! -d "$dir" ]]; then
+        echo "Error: Directory $dir does not exist or is not accessible." >&2
+        exit 1
+    fi
+done
+
+# формирование команды find
+find_cmd=(find "${directories[@]}" -type f -size +${minsize}c -printf '%s\t%p\n')
+
+# сортировка
+if $human_readable; then
+    sort_cmd=(sort -rh)
+else
+    sort_cmd=(sort -rn)
+fi
+
