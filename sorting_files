@@ -18,50 +18,59 @@ EOF
 N=0
 h_flag=0
 minsize=1
-directories=(".")
+directories=()
 
 # проход по аргументам
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --help|--usage)
+        --help)
             show_help
             exit 0
-            ;;
-        -h)
-            h_flag=1
-            shift
-            ;;
-        -N)
-            if [[ -z "$2" || "$2" =~ ^- ]]; then
-                echo "Error: -N option requires a numeric argument." >&2
-                exit 1
-            fi
-            N="$2"
-            shift 2
             ;;
         -s)
             if [[ -z "$2" || "$2" =~ ^- ]]; then
                 echo "Error: -s option requires a numeric argument." >&2
-                exit 1
+		exit 1
             fi
             minsize="$2"
             shift 2
-            ;;
+	    ;;
+	-h)
+	    h_flag=1
+	    shift 1
+	    ;;
+	-[1-9][0-9]*$)
+	    N=${1#-}
+	    if [[ "$N" =~ ^[1-9][0-9]*$ ]]; then
+		shift 1
+	    else
+		echo "Error: -N option requires a numeric argument." >&2
+		exit 1
+	    fi
+	    ;;
         --)
-            shift
-            directories=("$@")
-            break
+            shift 1
+	    while [[ $# -gt 0 ]]; do
+		directories+=("$1")
+		shift 1
+	    done
             ;;
         -*|--*)
             echo "Error: Unknown option $1" >&2
             exit 1
             ;;
         *)
-            directories=("$@")
-            break
+            directories+=("$1")
+	    shift 1
             ;;
     esac
 done
+
+if [[ ${#directories[@]} -eq 0 ]]; then
+    directories+=(".")
+fi
+
+echo "${directories[@]}"
 
 # проверка каталогов
 for dir in "${directories[@]}"; do
@@ -70,16 +79,6 @@ for dir in "${directories[@]}"; do
         exit 2
     fi
 done
-
-# формирование команды find
-find_cmd=(find "${directories[@]}" -type f -size +${minsize}c)
-
-# сортировка
-if [[ $h_flag -eq 1 ]]; then
-    sort_cmd=(du -h | sort -rh)
-else
-    sort_cmd=(find "${directories[@]}" -type f -size +${minsize}c -printf '%s %p\n' | sort -nr)
-fi
 
 # ограничение количества файлов
 if [[ $N -gt 0 ]]; then
@@ -90,7 +89,13 @@ fi
 
 # выполнение команд
 if [[ $h_flag -eq 1 ]]; then
-    "${find_cmd[@]}" | du -h | sort -rh | "${head_cmd[@]}"
+	find -- "${directories[@]}" -type f -size +${minsize}c -print0 | \
+	while IFS= read -r -d '' file; do
+		du -h -- "$file"
+	done | sort -rh | ${head_cmd[@]}
 else
-    "${find_cmd[@]}" -printf '%s %p\n' | sort -nr | "${head_cmd[@]}"
+	find -- "${directories[@]}" -type f -size +"${minsize}"c -printf '%s %p\n' | \
+    sort -nr | "${head_cmd[@]}"
 fi
+
+exit 0
