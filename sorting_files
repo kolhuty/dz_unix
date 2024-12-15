@@ -1,0 +1,96 @@
+#!/bin/bash
+
+show_help() {
+    cat << EOF
+Usage: topsize [--help] [-h] [-N] [-s minsize] [--] [dir...]
+
+Options:
+  --help        Show this help message and exit
+  -h            Display file sizes in human-readable format
+  -N <number>   Number of files to display (e.g., -10)
+  -s <minsize>  Minimum file size in bytes (default: 1 byte)
+  dir...        Directories to search (default: current directory)
+  --            Separator for options and directories
+EOF
+}
+
+
+N=0
+h_flag=0
+minsize=1
+directories=(".")
+
+# проход по аргументам
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --help|--usage)
+            show_help
+            exit 0
+            ;;
+        -h)
+            h_flag=1
+            shift
+            ;;
+        -N)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: -N option requires a numeric argument." >&2
+                exit 1
+            fi
+            N="$2"
+            shift 2
+            ;;
+        -s)
+            if [[ -z "$2" || "$2" =~ ^- ]]; then
+                echo "Error: -s option requires a numeric argument." >&2
+                exit 1
+            fi
+            minsize="$2"
+            shift 2
+            ;;
+        --)
+            shift
+            directories=("$@")
+            break
+            ;;
+        -*|--*)
+            echo "Error: Unknown option $1" >&2
+            exit 1
+            ;;
+        *)
+            directories=("$@")
+            break
+            ;;
+    esac
+done
+
+# проверка каталогов
+for dir in "${directories[@]}"; do
+    if [[ ! -d "$dir" ]]; then
+        echo "Error: Directory $dir does not exist or is not accessible." >&2
+        exit 2
+    fi
+done
+
+# формирование команды find
+find_cmd=(find "${directories[@]}" -type f -size +${minsize}c)
+
+# сортировка
+if [[ $h_flag -eq 1 ]]; then
+    sort_cmd=(du -h | sort -rh)
+else
+    sort_cmd=(find "${directories[@]}" -type f -size +${minsize}c -printf '%s %p\n' | sort -nr)
+fi
+
+# ограничение количества файлов
+if [[ $N -gt 0 ]]; then
+    head_cmd=(head -n "$N")
+else
+    head_cmd=(cat)
+fi
+
+# выполнение команд
+if [[ $h_flag -eq 1 ]]; then
+    "${find_cmd[@]}" | du -h | sort -rh | "${head_cmd[@]}"
+else
+    "${find_cmd[@]}" -printf '%s %p\n' | sort -nr | "${head_cmd[@]}"
+fi
